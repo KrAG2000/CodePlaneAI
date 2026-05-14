@@ -1,8 +1,6 @@
 # CodePlaneAI MVP
 
-This is a **basic working version** of the microservice you described.
-
-It does four real things already:
+It does four real things (For now! More features planned):
 
 1. accepts a plain-English engineering trigger,
 2. triages it into a structured execution plan,
@@ -26,13 +24,13 @@ Plain text trigger
 -> GitHub PR
 ```
 
-## What This MVP Is Not Yet
+## What This MVP Is Not Yet 
 
-- Slack-integrated
-- queue-backed
-- multi-tenant
-- provider-routed across many agents
-- production hardened
+- Slack-integrated (Any communication platform integration: Planned)
+- queue-backed (Planned)
+- multi-tenant (Planned)
+- provider-routed across many agents (Planned)
+- production hardened (Building for personal use for now)
 
 ## Endpoints
 
@@ -42,7 +40,8 @@ Health check.
 
 ### `POST /api/triggers/text`
 
-Creates an execution plan from a plain-English issue report.
+Creates an execution plan from a plain-English issue report. 
+[Planned for future - Image assessment for better triage accuracy]
 
 Headers:
 
@@ -122,7 +121,7 @@ npm run build
 npm start
 ```
 
-## Environment Variables
+## Environment Variables (A separate dashboard + secure DB implementation for saving of sensitive data securely required - P2)
 
 ### Required for plan-only mode
 
@@ -139,6 +138,8 @@ npm start
 - `GITHUB_OWNER`
 - `GITHUB_REPO`
 - `GITHUB_TOKEN`
+
+
 
 ## Example Request Flow
 
@@ -178,24 +179,15 @@ curl -X POST http://localhost:3000/api/executions/<execution-id>/agent-result \
 - `src/services/execution-service.ts`: orchestration state transitions
 - `src/store/file-store.ts`: local JSON persistence
 
-## What I Need From You
+## Pre-requisites
 
-To connect this MVP to your real repo and make it useful, I need:
+To connect this MVP to your real repo and make it useful, below items are requried beforehand:
 
 1. The GitHub repository URL or `owner/repo`.
-2. The local filesystem path where that repo is checked out on this machine.
-3. The default base branch, usually `main` or `master`.
-4. The validation commands that should run before commit/PR.
-5. Whether I should allow auto-push and PR creation immediately.
-6. A GitHub token with repo access, or confirmation that you want PR creation skipped for now.
-7. Any protected paths that must never be auto-committed, such as `infra/`, `db/migrations/`, or billing/auth code.
-8. Whether you want the next step to be Slack integration or direct coding-agent integration.
-
-## Recommended Next Step
-
-Once you send the repo details, I can wire this MVP to your actual codebase and then add one of these:
-
-- real Slack trigger endpoint,
-- agent adapter contract for Codex handoff,
-- repo-specific context discovery,
-- approval gate before push/PR.
+2. The local filesystem path where that repo is checked out on this machine. (Commands that make changes to local files outside the scope will be restricted and this service will not have access to files and folders outside the set scope aka `git clone` will not work unless access is given to the parent directory: `Needs handling`)
+3. The default base branch, usually `main` (Multiple branch support: P2).
+4. The validation commands that should run before commit/PR(If repo has followed any validations practices).
+5. Whether I should allow auto-push and PR creation immediately(Permission control setup, handled via dashboard: P2).
+6. A GitHub token with repo access, or confirmation that you want PR creation skipped for now(P2).
+7. Any protected paths that must never be auto-committed, such as `infra/`, `db/migrations/`, or billing/auth code(Exclude/Blacklist folder/files: P3).
+8. Real platform integration (e.g. Slack)
