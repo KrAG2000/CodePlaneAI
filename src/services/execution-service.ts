@@ -11,11 +11,40 @@ import { evaluatePolicy } from "./policy";
 import { notifyExecutionCreated, notifyExecutionFinished } from "./slack-service";
 import { triageMessage } from "./triage";
 
+const markExecutionFailed = async (
+  executionId: string,
+  reason: string,
+  agentRunPatch?: Partial<ExecutionRecord["agentRun"]>,
+): Promise<void> => {
+  const existing = executionStore.get(executionId);
+  if (!existing) {
+    return;
+  }
+
+  const saved = executionStore.save({
+    ...existing,
+    updatedAt: nowIso(),
+    status: "failed",
+    agentRun: existing.agentRun
+      ? {
+          ...existing.agentRun,
+          ...agentRunPatch,
+        }
+      : existing.agentRun,
+    gitOutcome: {
+      branchName: existing.agentRun?.branchName ?? "",
+      skipped: true,
+      reasons: [reason],
+    },
+  });
+  await notifyExecutionFinished(saved);
+};
+
 export const createExecution = async (
   message: string,
   source: ExecutionRecord["source"] = "api",
 ): Promise<ExecutionRecord> => {
-  const triage = triageMessage(message);
+  const triage = await triageMessage(message);
   const policy = evaluatePolicy(config.protectedPaths);
   const context = buildContext(message, triage);
   const plan = buildAgentPlan(message, triage, context);
@@ -34,7 +63,14 @@ export const createExecution = async (
   };
 
   record.handoffPath = writeCodexHandoff(record);
-  const withAgentRun = startCodexRun(record);
+  const withAgentRun = startCodexRun(record, {
+    onComplete: async (executionId, agentResult) => {
+      await applyAgentResult(executionId, agentResult);
+    },
+    onFailure: async (executionId, reason, agentRunPatch) => {
+      await markExecutionFailed(executionId, reason, agentRunPatch);
+    },
+  });
   const saved = executionStore.save(withAgentRun);
   await notifyExecutionCreated(saved);
   return saved;
@@ -77,6 +113,7 @@ export const applyAgentResult = async (
       existing.id,
       existing.message,
       agentResult.changedFiles,
+      existing.agentRun?.branchName,
     );
     next.status = next.gitOutcome.skipped ? "blocked" : "pr_created";
   }
