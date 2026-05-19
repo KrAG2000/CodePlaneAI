@@ -212,6 +212,15 @@ CodePlaneAI now uses a provider-agnostic HTTP middleware layer.
 
 Important: Slack incoming webhooks can send messages into Slack. They cannot receive channel messages. For Slack-originated triggers, use a Slack slash command pointed at `/slack/command`, Slack Events API pointed at `/slack/events`, or a relay service that calls `/api/triggers/slack`.
 
+### Optional automatic agent execution
+
+- `ENABLE_AGENT_AUTO_RUN=true`
+- `AGENT_PROVIDER=codex` or `claude`
+- `AGENT_COMMAND=codex` or `claude`
+- `AGENT_MODEL` to pin a CLI model if needed
+- `AGENT_TIMEOUT_MS` for longer-running automated sessions
+- `CODEX_SANDBOX` applies when using Codex CLI automation
+
 ## Current Config Defaults
 
 The local `.env` and `.env.example` are configured for:
