@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { config } from "../config";
-import { TriageResult } from "../types";
+import { TaskType, TriageResult } from "../types";
 import { dedupe } from "../utils";
 
 const exists = (targetPath: string): boolean => fs.existsSync(targetPath);
@@ -19,16 +19,47 @@ export const buildContext = (message: string, triage: TriageResult): ContextSnap
   const relevantAreas: string[] = [];
   const repoSignals: string[] = [];
 
-  if (text.includes("backend") || triage.taskType === "api-issue") {
-    relevantAreas.push("backend services", "API handlers", "response serializers");
+  switch (triage.taskType) {
+    case TaskType.ApiIssue:
+      relevantAreas.push("backend services", "API handlers", "response serializers");
+      break;
+    case TaskType.DataIssue:
+      relevantAreas.push("data fetching logic", "query/filter builders", "transformation mappers");
+      break;
+    case TaskType.UiIssue:
+      relevantAreas.push("page-level API integration", "view-model mapping");
+      break;
+    case TaskType.Performance:
+      relevantAreas.push("performance hotspots", "query execution", "caching layers");
+      break;
+    case TaskType.Infrastructure:
+      relevantAreas.push("deployment configuration", "runtime environment", "operational tooling");
+      break;
+    case TaskType.Dependency:
+      relevantAreas.push("dependency manifests", "lockfiles", "integration boundaries");
+      break;
+    case TaskType.Security:
+      relevantAreas.push("auth flows", "permission checks", "secret handling");
+      break;
+    case TaskType.TestFailure:
+      relevantAreas.push("test suites", "fixtures", "failing assertions");
+      break;
+    default:
+      break;
   }
 
-  if (text.includes("segment") || text.includes("wrong data") || triage.taskType === "data-issue") {
-    relevantAreas.push("data fetching logic", "query/filter builders", "transformation mappers");
-  }
+  if (relevantAreas.length === 0) {
+    if (text.includes("backend") || text.includes("api")) {
+      relevantAreas.push("backend services", "API handlers", "response serializers");
+    }
 
-  if (text.includes("page") || triage.taskType === "ui-issue") {
-    relevantAreas.push("page-level API integration", "view-model mapping");
+    if (text.includes("data") || text.includes("mapping") || text.includes("query")) {
+      relevantAreas.push("data fetching logic", "query/filter builders", "transformation mappers");
+    }
+
+    if (text.includes("page") || text.includes("ui") || text.includes("frontend")) {
+      relevantAreas.push("page-level API integration", "view-model mapping");
+    }
   }
 
   if (config.localRepoPath) {

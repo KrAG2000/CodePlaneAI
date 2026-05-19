@@ -1,17 +1,28 @@
-export type Severity = "low" | "medium" | "high";
-export type TaskType =
-  | "bugfix"
-  | "data-issue"
-  | "api-issue"
-  | "ui-issue"
-  | "performance"
-  | "unknown";
+export enum Severity {
+  Low = "low",
+  Medium = "medium",
+  High = "high",
+}
+
+export enum TaskType {
+  Bugfix = "bugfix",
+  DataIssue = "data-issue",
+  ApiIssue = "api-issue",
+  UiIssue = "ui-issue",
+  Performance = "performance",
+  Infrastructure = "infrastructure",
+  Security = "security",
+  Dependency = "dependency",
+  TestFailure = "test-failure",
+  Unknown = "unknown",
+}
 
 export type PolicyStatus = "allowed" | "needs_review" | "denied";
 export type ExecutionStatus =
   | "created"
   | "planned"
   | "awaiting_agent"
+  | "agent_running"
   | "agent_result_received"
   | "validated"
   | "pr_created"
@@ -63,10 +74,16 @@ export interface ExecutionRecord {
 }
 
 export interface AgentRun {
-  provider: "codex";
+  provider: "codex" | "claude";
   startedAt: string;
   command: string;
   logPath: string;
+  responsePath?: string;
+  branchName?: string;
+  completedAt?: string;
+  exitCode?: number;
+  signal?: string;
+  lastError?: string;
 }
 
 export interface AgentResult {

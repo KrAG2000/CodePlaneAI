@@ -75,6 +75,7 @@ export const finalizeGitFlow = async (
   executionId: string,
   message: string,
   changedFiles: string[],
+  existingBranchName?: string,
 ): Promise<GitOutcome> => {
   if (!hasRepoPath()) {
     return {
@@ -108,10 +109,29 @@ export const finalizeGitFlow = async (
     }
   }
 
-  const branchName = `codeplane/${executionId}-${slugify(message)}`;
-  await git.checkout(config.githubBaseBranch);
-  await git.pull(config.githubRemote, config.githubBaseBranch);
-  await git.checkoutLocalBranch(branchName);
+  const branchName =
+    existingBranchName ??
+    `codeplane/${executionId}-${slugify(message)}`;
+
+  if (existingBranchName) {
+    await git.checkout(existingBranchName);
+  } else {
+    const remoteBaseRef = `${config.githubRemote}/${config.githubBaseBranch}`;
+
+    await git.fetch(config.githubRemote, config.githubBaseBranch);
+
+    const localBranches = await git.branchLocal();
+    if (localBranches.all.includes(branchName)) {
+      return {
+        branchName,
+        skipped: true,
+        reasons: [`Branch already exists: ${branchName}`],
+      };
+    }
+
+    await git.checkoutBranch(branchName, remoteBaseRef);
+  }
+
   await git.add(changedFiles);
   await git.commit(`fix: ${message}`);
 
@@ -152,4 +172,47 @@ export const finalizeGitFlow = async (
     skipped: false,
     reasons: [],
   };
+};
+
+export const prepareExecutionBranch = async (
+  executionId: string,
+  message: string,
+): Promise<string> => {
+  if (!hasRepoPath()) {
+    throw new Error(
+      "LOCAL_REPO_PATH is not configured yet, so branch preparation was skipped.",
+    );
+  }
+
+  const git = simpleGit(config.localRepoPath);
+  const status = await git.status();
+  if (!status.isClean()) {
+    throw new Error(
+      "Target repository worktree is not clean. Auto agent runs require a clean worktree to avoid committing unrelated changes.",
+    );
+  }
+
+  const branchName = `codeplane/${executionId}-${slugify(message)}`;
+  const remoteBaseRef = `${config.githubRemote}/${config.githubBaseBranch}`;
+
+  await git.fetch(config.githubRemote, config.githubBaseBranch);
+
+  const localBranches = await git.branchLocal();
+  if (localBranches.all.includes(branchName)) {
+    await git.checkout(branchName);
+    return branchName;
+  }
+
+  await git.checkoutBranch(branchName, remoteBaseRef);
+  return branchName;
+};
+
+export const detectChangedFiles = async (): Promise<string[]> => {
+  if (!hasRepoPath()) {
+    return [];
+  }
+
+  const git = simpleGit(config.localRepoPath);
+  const status = await git.status();
+  return [...new Set(status.files.map((file) => file.path))];
 };

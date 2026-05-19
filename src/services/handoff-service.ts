@@ -32,17 +32,23 @@ export const writeCodexHandoff = (record: ExecutionRecord): string => {
     "",
     "## After Codex Finishes",
     "",
-    "Call the agent-result endpoint with the summary and changed files:",
+    config.enableAgentAutoRun
+      ? "The configured agent runner will finalize this execution automatically after it finishes."
+      : "Call the agent-result endpoint with the summary and changed files:",
     "",
-    "```bash",
-    `curl -X POST http://localhost:${config.port}/api/executions/${record.id}/agent-result \\`,
-    "  -H 'content-type: application/json' \\",
-    "  -H 'x-api-token: <API_TRIGGER_TOKEN>' \\",
-    "  -d '{",
-    '    "summary": "Describe what Codex changed",',
-    '    "changedFiles": ["path/to/file.ts"]',
-    "  }'",
-    "```",
+    ...(config.enableAgentAutoRun
+      ? []
+      : [
+          "```bash",
+          `curl -X POST http://localhost:${config.port}/api/executions/${record.id}/agent-result \\`,
+          "  -H 'content-type: application/json' \\",
+          "  -H 'x-api-token: <API_TRIGGER_TOKEN>' \\",
+          "  -d '{",
+          '    "summary": "Describe what Codex changed",',
+          '    "changedFiles": ["path/to/file.ts"]',
+          "  }'",
+          "```",
+        ]),
     "",
   ].join("\n");
 

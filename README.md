@@ -170,6 +170,29 @@ npm start
 ### Required for plan-only mode
 
 - `API_TRIGGER_TOKEN`
+- `TRIAGE_MODEL_ID`
+
+### AI routing configuration
+
+- `AI_CONFIG_DIR` defaults to `config/ai-models`
+- `TRIAGE_MODEL_ID` selects the primary model config file by id
+- `TRIAGE_FALLBACK_MODEL_IDS` is an optional comma-separated fallback chain
+- provider API keys are read directly inside each `.js` model config from `process.env`
+
+### AI model configs
+
+CodePlaneAI now uses a provider-agnostic HTTP middleware layer.
+
+- Runtime model configs live in `config/ai-models/*.js`
+- Each file exports a model config object and can read secrets directly from `process.env`
+- Each file defines the provider name, platform name, base URL, endpoint path, auth style, model id, default params, and payload protocol
+- Supported protocol families in this repo are:
+  - `openai-responses`
+  - `openai-chat`
+  - `anthropic-messages`
+  - `google-gemini-generate-content`
+- Add a new model on an existing protocol by dropping in another config file
+- Add a new provider wire format by adding one adapter under `src/ai/providers`
 
 ### Required for validation and Git operations
 
@@ -188,6 +211,15 @@ npm start
 - `SLACK_INCOMING_WEBHOOK_URL`
 
 Important: Slack incoming webhooks can send messages into Slack. They cannot receive channel messages. For Slack-originated triggers, use a Slack slash command pointed at `/slack/command`, Slack Events API pointed at `/slack/events`, or a relay service that calls `/api/triggers/slack`.
+
+### Optional automatic agent execution
+
+- `ENABLE_AGENT_AUTO_RUN=true`
+- `AGENT_PROVIDER=codex` or `claude`
+- `AGENT_COMMAND=codex` or `claude`
+- `AGENT_MODEL` to pin a CLI model if needed
+- `AGENT_TIMEOUT_MS` for longer-running automated sessions
+- `CODEX_SANDBOX` applies when using Codex CLI automation
 
 ## Current Config Defaults
 
@@ -260,3 +292,5 @@ To connect this MVP to your real repo and make it useful, below items are requri
 6. A GitHub token with repo access, or confirmation that you want PR creation skipped for now(P2).
 7. Any protected paths that must never be auto-committed, such as `infra/`, `db/migrations/`, or billing/auth code(Exclude/Blacklist folder/files: P3).
 8. Real platform integration (e.g. Slack)
+
+Test pipeline change: README updated through CodePlaneAI flow.
