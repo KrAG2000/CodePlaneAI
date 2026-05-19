@@ -3,12 +3,18 @@ import { executionStore } from "../store/file-store";
 import { AgentResult, ExecutionRecord } from "../types";
 import { createExecutionId, nowIso } from "../utils";
 import { buildContext } from "./context";
+import { startCodexRun } from "./codex-runner";
 import { finalizeGitFlow, runValidation } from "./git-service";
+import { readCodexHandoff, writeCodexHandoff } from "./handoff-service";
 import { buildAgentPlan } from "./planner";
 import { evaluatePolicy } from "./policy";
+import { notifyExecutionCreated, notifyExecutionFinished } from "./slack-service";
 import { triageMessage } from "./triage";
 
-export const createExecution = (message: string): ExecutionRecord => {
+export const createExecution = async (
+  message: string,
+  source: ExecutionRecord["source"] = "api",
+): Promise<ExecutionRecord> => {
   const triage = triageMessage(message);
   const policy = evaluatePolicy(config.protectedPaths);
   const context = buildContext(message, triage);
@@ -18,6 +24,7 @@ export const createExecution = (message: string): ExecutionRecord => {
   const record: ExecutionRecord = {
     id: createExecutionId(),
     message,
+    source,
     createdAt: now,
     updatedAt: now,
     status: "awaiting_agent",
@@ -26,13 +33,26 @@ export const createExecution = (message: string): ExecutionRecord => {
     plan,
   };
 
-  return executionStore.save(record);
+  record.handoffPath = writeCodexHandoff(record);
+  const withAgentRun = startCodexRun(record);
+  const saved = executionStore.save(withAgentRun);
+  await notifyExecutionCreated(saved);
+  return saved;
 };
 
 export const listExecutions = (): ExecutionRecord[] => executionStore.list();
 
 export const getExecution = (id: string): ExecutionRecord | undefined =>
   executionStore.get(id);
+
+export const getExecutionHandoff = (id: string): string => {
+  const execution = executionStore.get(id);
+  if (!execution?.handoffPath) {
+    throw new Error(`Handoff not found for execution: ${id}`);
+  }
+
+  return readCodexHandoff(execution.handoffPath);
+};
 
 export const applyAgentResult = async (
   id: string,
@@ -61,5 +81,7 @@ export const applyAgentResult = async (
     next.status = next.gitOutcome.skipped ? "blocked" : "pr_created";
   }
 
-  return executionStore.save(next);
+  const saved = executionStore.save(next);
+  await notifyExecutionFinished(saved);
+  return saved;
 };

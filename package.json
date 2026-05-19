@@ -10,9 +10,11 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
+    "@fastify/formbody": "^8.0.2",
     "@octokit/rest": "^22.0.0",
     "dotenv": "^16.5.0",
     "fastify": "^5.3.3",
+    "fastify-raw-body": "^5.0.0",
     "minimatch": "^10.0.1",
     "simple-git": "^3.28.0",
     "zod": "^3.25.28"

@@ -1,11 +1,13 @@
 # CodePlaneAI MVP
 
-It does four real things (For now! More features planned):
+It does six real things (For now! More features planned):
 
 1. accepts a plain-English engineering trigger,
 2. triages it into a structured execution plan,
-3. waits for the coding agent to return the result,
-4. validates and optionally performs branch, commit, push, and PR creation.
+3. writes a Codex handoff file,
+4. sends optional Slack status notifications,
+5. waits for the coding agent to return the result,
+6. validates and optionally performs branch, commit, push, and PR creation.
 
 ## What This MVP Is
 
@@ -17,16 +19,16 @@ Current flow:
 Plain text trigger
 -> triage
 -> policy check
--> structured agent handoff plan
+-> structured Codex handoff file
 -> agent makes changes in repo
 -> microservice validates
 -> git branch/commit/push
--> GitHub PR
+-> GitHub PR if enabled
 ```
 
 ## What This MVP Is Not Yet 
 
-- Slack-integrated (Any communication platform integration: Planned)
+- full Slack Events API verification (P2)
 - queue-backed (Planned)
 - multi-tenant (Planned)
 - provider-routed across many agents (Planned)
@@ -56,6 +58,48 @@ Example body:
   "message": "The backend is showing wrong data on our segment page. Please check."
 }
 ```
+
+### `POST /api/triggers/slack`
+
+Creates an execution from a Slack-like JSON payload.
+
+Headers:
+
+```text
+x-api-token: <API_TRIGGER_TOKEN>
+```
+
+Example body:
+
+```json
+{
+  "text": "The backend is showing wrong data on our segment page. Please check.",
+  "user": "backend-team",
+  "channel": "engineering"
+}
+```
+
+### `POST /slack/command`
+
+Slack slash-command compatible endpoint.
+
+Example form body:
+
+```text
+text=The backend is showing wrong data on our segment page. Please check.
+```
+
+If `SLACK_VERIFICATION_TOKEN` is configured, the request must include the matching Slack token.
+
+### `POST /slack/events`
+
+Slack Events API compatible endpoint.
+
+It handles Slack URL verification and creates executions from plain channel message events. It ignores bot messages and message subtypes.
+
+### `GET /api/executions/:id/handoff`
+
+Returns the generated Codex handoff Markdown for an execution.
 
 ### `GET /api/executions`
 
@@ -131,13 +175,30 @@ npm start
 
 - `LOCAL_REPO_PATH`
 - `GITHUB_BASE_BRANCH`
-- `VALIDATION_COMMANDS`
+- `VALIDATION_COMMANDS` if you want validation. Empty means validation is skipped.
 
 ### Required for PR creation
 
 - `GITHUB_OWNER`
 - `GITHUB_REPO`
 - `GITHUB_TOKEN`
+
+### Required for Slack notifications
+
+- `SLACK_INCOMING_WEBHOOK_URL`
+
+Important: Slack incoming webhooks can send messages into Slack. They cannot receive channel messages. For Slack-originated triggers, use a Slack slash command pointed at `/slack/command`, Slack Events API pointed at `/slack/events`, or a relay service that calls `/api/triggers/slack`.
+
+## Current Config Defaults
+
+The local `.env` and `.env.example` are configured for:
+
+- repo: `KrAG2000/CodePlaneAI`
+- base branch: `main`
+- PR creation: disabled
+- git push: enabled
+- validation: skipped
+- Codex handoff directory: `.data/handoffs`
 
 
 
@@ -152,9 +213,15 @@ curl -X POST http://localhost:3000/api/triggers/text \
   -d '{"message":"The backend is showing wrong data on our segment page. Please check."}'
 ```
 
-### 2. Copy `plan.handoffPrompt` into your coding agent
+### 2. Open the generated Codex handoff file
 
-The coding agent then works on your repo and makes changes locally.
+The response includes `handoffPath`, for example:
+
+```text
+.data/handoffs/exec_abc123.md
+```
+
+Open that file in VS Code and use it as the Codex task prompt. Codex then works on your repo and makes changes locally.
 
 ### 3. Finalize the run
 
@@ -175,6 +242,8 @@ curl -X POST http://localhost:3000/api/executions/<execution-id>/agent-result \
 - `src/services/policy.ts`: lightweight policy checks
 - `src/services/context.ts`: repo/context shaping
 - `src/services/planner.ts`: structured agent handoff plan
+- `src/services/handoff-service.ts`: Codex handoff Markdown writer
+- `src/services/slack-service.ts`: Slack webhook notifications
 - `src/services/git-service.ts`: validation, branch, commit, push, PR
 - `src/services/execution-service.ts`: orchestration state transitions
 - `src/store/file-store.ts`: local JSON persistence

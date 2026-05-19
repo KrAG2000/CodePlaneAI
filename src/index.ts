@@ -1,12 +1,16 @@
 import Fastify from "fastify";
+import formBody from "@fastify/formbody";
+import rawBody from "fastify-raw-body";
 import { z } from "zod";
 import { config } from "./config";
 import {
   applyAgentResult,
   createExecution,
   getExecution,
+  getExecutionHandoff,
   listExecutions,
 } from "./services/execution-service";
+import { verifySlackSignature } from "./services/slack-signature";
 
 const server = Fastify({
   logger: {
@@ -14,14 +18,22 @@ const server = Fastify({
   },
 });
 
+server.register(formBody);
+server.register(rawBody, {
+  field: "rawBody",
+  global: false,
+  encoding: "utf8",
+  runFirst: true,
+});
+
 server.addHook("onRequest", async (request, reply) => {
-  if (request.url === "/health") {
+  if (request.url === "/health" || request.url.startsWith("/slack/")) {
     return;
   }
 
   const token = request.headers["x-api-token"];
   if (token !== config.apiTriggerToken) {
-    reply.code(401).send({
+    return reply.code(401).send({
       error: "Unauthorized",
       message: "Missing or invalid x-api-token header.",
     });
@@ -56,7 +68,7 @@ server.post("/api/triggers/text", async (request) => {
     })
     .parse(request.body);
 
-  const execution = createExecution(body.message);
+  const execution = await createExecution(body.message, "api");
 
   return {
     executionId: execution.id,
@@ -64,9 +76,146 @@ server.post("/api/triggers/text", async (request) => {
     triage: execution.triage,
     policy: execution.policy,
     plan: execution.plan,
+    handoffPath: execution.handoffPath,
     nextStep:
-      "Pass plan.handoffPrompt to your coding agent. After the code change is made in the configured repo, call POST /api/executions/:id/agent-result.",
+      "Open the handoff file in VS Code/Codex. After the code change is made in the configured repo, call POST /api/executions/:id/agent-result.",
   };
+});
+
+server.post("/api/triggers/slack", async (request) => {
+  const body = z
+    .object({
+      text: z.string().min(10),
+      user: z.string().optional(),
+      channel: z.string().optional(),
+    })
+    .parse(request.body);
+
+  const execution = await createExecution(body.text, "slack");
+
+  return {
+    executionId: execution.id,
+    status: execution.status,
+    handoffPath: execution.handoffPath,
+    plan: execution.plan,
+  };
+});
+
+server.post(
+  "/slack/command",
+  {
+    config: {
+      rawBody: true,
+    },
+  },
+  async (request, reply) => {
+    if (!verifySlackSignature(request)) {
+      reply.code(401).send("Invalid Slack signature.");
+      return;
+    }
+
+  const body = z
+    .object({
+      text: z.string().min(10),
+      token: z.string().optional(),
+      user_name: z.string().optional(),
+      channel_name: z.string().optional(),
+    })
+    .parse(request.body);
+
+  if (
+    config.slackVerificationToken &&
+    body.token !== config.slackVerificationToken
+  ) {
+    reply.code(401).send("Invalid Slack verification token.");
+    return;
+  }
+
+  const execution = await createExecution(body.text, "slack");
+
+  return {
+    response_type: "in_channel",
+    text: [
+      `CodePlaneAI accepted execution ${execution.id}.`,
+      `Triage: ${execution.triage.taskType} / ${execution.triage.severity}.`,
+      `Codex handoff: ${execution.handoffPath}.`,
+    ].join("\n"),
+  };
+  },
+);
+
+server.post(
+  "/slack/events",
+  {
+    config: {
+      rawBody: true,
+    },
+  },
+  async (request, reply) => {
+    if (!verifySlackSignature(request)) {
+      reply.code(401).send("Invalid Slack signature.");
+      return;
+    }
+
+  const body = z
+    .object({
+      type: z.string(),
+      challenge: z.string().optional(),
+      token: z.string().optional(),
+      event: z
+        .object({
+          type: z.string(),
+          text: z.string().optional(),
+          subtype: z.string().optional(),
+          bot_id: z.string().optional(),
+        })
+        .optional(),
+    })
+    .parse(request.body);
+
+  if (
+    config.slackVerificationToken &&
+    body.token !== config.slackVerificationToken
+  ) {
+    reply.code(401).send("Invalid Slack verification token.");
+    return;
+  }
+
+  if (body.type === "url_verification") {
+    return { challenge: body.challenge };
+  }
+
+  if (
+    body.type !== "event_callback" ||
+    body.event?.type !== "message" ||
+    !body.event.text ||
+    body.event.subtype ||
+    body.event.bot_id
+  ) {
+    return { ok: true, ignored: true };
+  }
+
+  const execution = await createExecution(body.event.text, "slack");
+
+  return {
+    ok: true,
+    executionId: execution.id,
+    handoffPath: execution.handoffPath,
+  };
+  },
+);
+
+server.get("/api/executions/:id/handoff", async (request, reply) => {
+  const params = z.object({ id: z.string() }).parse(request.params);
+
+  try {
+    reply.type("text/markdown").send(getExecutionHandoff(params.id));
+  } catch (error) {
+    reply.code(404).send({
+      error: "Not Found",
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
 });
 
 server.post("/api/executions/:id/agent-result", async (request, reply) => {

@@ -24,12 +24,12 @@ export const config = {
   localRepoPath: process.env.LOCAL_REPO_PATH
     ? path.resolve(process.env.LOCAL_REPO_PATH)
     : "",
-  githubOwner: process.env.GITHUB_OWNER ?? "",
-  githubRepo: process.env.GITHUB_REPO ?? "",
+  githubOwner: process.env.GITHUB_OWNER ?? "KrAG2000",
+  githubRepo: process.env.GITHUB_REPO ?? "CodePlaneAI",
   githubBaseBranch: process.env.GITHUB_BASE_BRANCH ?? "main",
   githubRemote: process.env.GITHUB_REMOTE ?? "origin",
   githubToken: process.env.GITHUB_TOKEN ?? "",
-  enableGithubPr: toBoolean(process.env.ENABLE_GITHUB_PR, true),
+  enableGithubPr: toBoolean(process.env.ENABLE_GITHUB_PR, false),
   enableGitPush: toBoolean(process.env.ENABLE_GIT_PUSH, true),
   autoCommitOnAgentResult: toBoolean(
     process.env.AUTO_COMMIT_ON_AGENT_RESULT,
@@ -38,5 +38,15 @@ export const config = {
   requireCleanWorktree: toBoolean(process.env.REQUIRE_CLEAN_WORKTREE, false),
   validationCommands: toList(process.env.VALIDATION_COMMANDS),
   protectedPaths: toList(process.env.PROTECTED_PATHS),
+  slackIncomingWebhookUrl: process.env.SLACK_INCOMING_WEBHOOK_URL ?? "",
+  slackSigningSecret: process.env.SLACK_SIGNING_SECRET ?? "",
+  slackVerificationToken: process.env.SLACK_VERIFICATION_TOKEN ?? "",
+  enableCodexAutoRun: toBoolean(process.env.ENABLE_CODEX_AUTO_RUN, false),
+  codexCommand: process.env.CODEX_COMMAND ?? "codex",
+  codexSandbox: process.env.CODEX_SANDBOX ?? "workspace-write",
+  codexApprovalPolicy: process.env.CODEX_APPROVAL_POLICY ?? "never",
+  codexHandoffDir: process.env.CODEX_HANDOFF_DIR
+    ? path.resolve(process.env.CODEX_HANDOFF_DIR)
+    : path.resolve(".data", "handoffs"),
   dataDir: path.resolve(".data"),
 };

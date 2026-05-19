@@ -48,15 +48,25 @@ export interface AgentPlan {
 export interface ExecutionRecord {
   id: string;
   message: string;
+  source: "api" | "slack" | "manual";
   createdAt: string;
   updatedAt: string;
   status: ExecutionStatus;
   triage: TriageResult;
   policy: PolicyDecision;
   plan: AgentPlan;
+  handoffPath?: string;
+  agentRun?: AgentRun;
   agentResult?: AgentResult;
   validation?: ValidationResult;
   gitOutcome?: GitOutcome;
+}
+
+export interface AgentRun {
+  provider: "codex";
+  startedAt: string;
+  command: string;
+  logPath: string;
 }
 
 export interface AgentResult {
